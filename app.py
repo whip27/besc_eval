@@ -2,9 +2,9 @@ import streamlit as st
 import os
 import glob
 import random
-import gspread
 import pandas as pd
 import time
+import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 from PIL import Image as PILImage
@@ -62,7 +62,7 @@ st.markdown(
 BASE_DIR = "Image"
 MAX_OBSERVATION_IMAGES = 100
 OBSERVATION_NUM_COLS = 6
-OBSERVATION_SECONDS = 4
+OBSERVATION_SECONDS = 120
 
 parts_options = {
     "こけし": ["頭部", "胴体"],
@@ -71,11 +71,11 @@ parts_options = {
 }
 
 score_map = {
-    "🔴 典型的": 1,
-    "🔴 やや典型的": 2,
-    "⚫ どちらとも言い難い": 3,
-    "🟡 やや非典型的": 4,
-    "🟡 非典型的": 5
+    "🔴 典型的": -2,
+    "🔴 やや典型的": -1,
+    "⚫ どちらとも言い難い": 0,
+    "🟡 やや非典型的": 1,
+    "🟡 非典型的": 2
 }
 score_options = list(score_map.keys())
 
@@ -119,7 +119,7 @@ def get_exhibit_structure(base_dir):
             images = glob.glob(os.path.join(folder_path, "*"))
             images = [
                 img for img in images
-                if img.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
+                if img.lower().endswith((".jpg", ".jpeg"))
             ]
             images = sorted(images)
             if folder == "all":
@@ -170,6 +170,8 @@ if "name" not in st.session_state:
     st.session_state.name = ""
 if "saved" not in st.session_state:
     st.session_state.saved = False
+if "save_failed" not in st.session_state:
+    st.session_state.save_failed = False
 if "observation_start_time" not in st.session_state:
     st.session_state.observation_start_time = None
 
@@ -351,12 +353,35 @@ elif st.session_state.step == "evaluation":
 
 elif st.session_state.step == "finish":
     st.title("評価完了")
-    st.success("すべての評価が終了しました。\n\nブラウザはこのまま閉じていただいて問題ありません。\n\nご協力いただき、ありがとうございました。")
     df = pd.DataFrame(st.session_state.answers)
-    if not st.session_state.saved:
+    csv_data = df.to_csv(index=False).encode('utf-8-sig')
+    
+    if not st.session_state.saved and not st.session_state.save_failed:
         try:
             save_to_gsheet(df)
             st.session_state.saved = True
-            st.success("Google Sheetsへ保存しました")
         except Exception as e:
-            st.error(f"Google Sheets保存エラー: {e}")
+            st.session_state.save_failed = True
+
+    if st.session_state.saved:
+        st.success("すべての評価が終了しました。\n\nデータは正常にGoogle Sheetsへ保存されました。\n\nブラウザはこのまま閉じていただいて問題ありません。ご協力ありがとうございました。")
+    
+    elif st.session_state.save_failed:
+        st.error("【重要】Google Sheetsへの自動保存に失敗しました（サーバー通信エラー等）。")
+        st.markdown(
+            """
+            <div class="custom-card" style="border: 2px solid #ef4444; background-color: #fef2f2;">
+            <3 style="color: #dc2626;">データの個別提出のお願い</h3>
+            <p>ネットワークエラー等により、評価データがスプレッドシートに反映されませんでした。</p>
+            <p>お手数ですが、<b>以下のボタンから評価データをダウンロードし、木下までファイル（CSV）をご提出ください。</b></p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        filename = f"evaluation_{st.session_state.name}_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
+        st.download_button(
+            label="評価データをダウンロードする",
+            data=csv_data,
+            file_name=filename,
+            mime="text/csv",
+        )
