@@ -6,6 +6,7 @@ import pandas as pd
 import time
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+from PIL import Image as PILImage
 
 st.set_page_config(
     page_title="展示物評価アプリ",
@@ -76,6 +77,22 @@ score_map = {
     "🟡 非典型的": 2
 }
 score_options = list(score_map.keys())
+
+@st.cache_data
+def load_and_center_crop(image_path, size=300):
+    try:
+        with PILImage.open(image_path) as img:
+            img = img.convert("RGB")
+            w, h = img.size
+            crop_size = min(w, h)
+            left = (w - crop_size) // 2
+            top = (h - crop_size) // 2
+            right = (w + crop_size) // 2
+            bottom = (h + crop_size) // 2
+            img_cropped = img.crop((left, top, right, bottom))
+            return img_cropped.resize((size, size), PILImage.Resampling.LANCZOS)
+    except:
+        return None
 
 @st.cache_data
 def get_exhibit_structure(base_dir):
@@ -232,7 +249,11 @@ if st.session_state.step == "observation":
             idx = i + j
             if idx < len(images):
                 with cols[j]:
-                    st.image(images[idx], use_container_width=True)
+                    cropped_img = load_and_center_crop(images[idx], size=300)
+                    if cropped_img:
+                        st.image(cropped_img, use_container_width=True)
+                    else:
+                        st.image(images[idx], use_container_width=True)
                     
     st.divider()
     button_disabled = remaining_time > 0
@@ -258,7 +279,11 @@ elif st.session_state.step == "evaluation":
     current_image = all_images[st.session_state.eval_index]
     col1, col2 = st.columns([1, 1])
     with col1:
-        st.image(current_image, use_container_width=True)
+        eval_cropped_img = load_and_center_crop(current_image, size=600)
+        if eval_cropped_img:
+            st.image(eval_cropped_img, use_container_width=True)
+        else:
+            st.image(current_image, use_container_width=True)
         st.markdown(
             f"""
             <div class="custom-card">
