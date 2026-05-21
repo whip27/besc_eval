@@ -4,7 +4,6 @@ import glob
 import random
 import pandas as pd
 import time
-import base64
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
@@ -77,24 +76,6 @@ score_map = {
     "🟡 非典型的": 2
 }
 score_options = list(score_map.keys())
-
-def get_image_base64(path):
-    try:
-        with open(path, "rb") as f:
-            data = f.read()
-        ext = os.path.splitext(path)[1][1:].lower()
-        if ext in ["jpg", "jpeg"]:
-            mime = "image/jpeg"
-        elif ext == "png":
-            mime = "image/png"
-        elif ext == "webp":
-            mime = "image/webp"
-        else:
-            mime = "image/jpeg"
-        b64 = base64.b64encode(data).decode()
-        return f"data:{mime};base64,{b64}"
-    except:
-        return ""
 
 @st.cache_data
 def get_exhibit_structure(base_dir):
@@ -251,12 +232,8 @@ if st.session_state.step == "observation":
             idx = i + j
             if idx < len(images):
                 with cols[j]:
-                    img_b64 = get_image_base64(images[idx])
-                    if img_b64:
-                        html_code = f"""
-                        <img src="{img_b64}" style="width:100%; height:130px; object-fit:contain; background-color:#f1f3f5; border-radius:8px; margin-bottom:6px;">
-                        """
-                        st.markdown(html_code, unsafe_allow_html=True)
+                    st.image(images[idx], use_container_width=True)
+                    
     st.divider()
     button_disabled = remaining_time > 0
     if st.button("観察終了・評価へ進む", disabled=button_disabled):
@@ -281,12 +258,7 @@ elif st.session_state.step == "evaluation":
     current_image = all_images[st.session_state.eval_index]
     col1, col2 = st.columns([1, 1])
     with col1:
-        main_img_b64 = get_image_base64(current_image)
-        if main_img_b64:
-            main_html = f"""
-            <img src="{main_img_b64}" style="width:100%; height:auto; max-height:650px; object-fit:contain; display:block; border-radius:8px; margin-bottom:1rem;">
-            """
-            st.markdown(main_html, unsafe_allow_html=True)
+        st.image(current_image, use_container_width=True)
         st.markdown(
             f"""
             <div class="custom-card">
