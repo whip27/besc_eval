@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import glob
 import random
+import gspread
 import pandas as pd
 import time
 from google.oauth2.service_account import Credentials
