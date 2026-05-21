@@ -3,7 +3,6 @@ import os
 import glob
 import random
 import pandas as pd
-import gspread
 import time
 import base64
 from google.oauth2.service_account import Credentials
