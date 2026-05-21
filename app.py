@@ -3,11 +3,10 @@ import os
 import glob
 import random
 import pandas as pd
-import gspread
 import time
-import base64
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+from PIL import Image as PILImage
 
 st.set_page_config(
     page_title="展示物評価アプリ",
@@ -62,7 +61,7 @@ st.markdown(
 BASE_DIR = "Image"
 MAX_OBSERVATION_IMAGES = 100
 OBSERVATION_NUM_COLS = 6
-OBSERVATION_SECONDS = 2
+OBSERVATION_SECONDS = 120
 
 parts_options = {
     "こけし": ["頭部", "胴体"],
@@ -79,23 +78,21 @@ score_map = {
 }
 score_options = list(score_map.keys())
 
-def get_image_base64(path):
+@st.cache_data
+def load_and_center_crop(image_path, size=300):
     try:
-        with open(path, "rb") as f:
-            data = f.read()
-        ext = os.path.splitext(path)[1][1:].lower()
-        if ext in ["jpg", "jpeg"]:
-            mime = "image/jpeg"
-        elif ext == "png":
-            mime = "image/png"
-        elif ext == "webp":
-            mime = "image/webp"
-        else:
-            mime = "image/jpeg"
-        b64 = base64.b64encode(data).decode()
-        return f"data:{mime};base64,{b64}"
+        with PILImage.open(image_path) as img:
+            img = img.convert("RGB")
+            w, h = img.size
+            crop_size = min(w, h)
+            left = (w - crop_size) // 2
+            top = (h - crop_size) // 2
+            right = (w + crop_size) // 2
+            bottom = (h + crop_size) // 2
+            img_cropped = img.crop((left, top, right, bottom))
+            return img_cropped.resize((size, size), PILImage.Resampling.LANCZOS)
     except:
-        return ""
+        return None
 
 @st.cache_data
 def get_exhibit_structure(base_dir):
@@ -135,10 +132,11 @@ def save_to_gsheet(df):
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    credentials = Credentials.from_service_account_file(
-        "service_account.json",
-        scopes=scopes
-    )
+    secret_info = dict(st.secrets["gcp_service_account"])
+    credentials = Credentials.from_service_account_info(
+        secret_info,
+        scopes=scopes)
+    
     gc = gspread.authorize(credentials)
     spreadsheet = gc.open("BESC_Evaluation")
     worksheet = spreadsheet.sheet1
@@ -251,12 +249,12 @@ if st.session_state.step == "observation":
             idx = i + j
             if idx < len(images):
                 with cols[j]:
-                    img_b64 = get_image_base64(images[idx])
-                    if img_b64:
-                        html_code = f"""
-                        <img src="{img_b64}" style="width:100%; height:130px; object-fit:contain; background-color:#f1f3f5; border-radius:8px; margin-bottom:6px;">
-                        """
-                        st.markdown(html_code, unsafe_allow_html=True)
+                    cropped_img = load_and_center_crop(images[idx], size=300)
+                    if cropped_img:
+                        st.image(cropped_img, use_container_width=True)
+                    else:
+                        st.image(images[idx], use_container_width=True)
+                    
     st.divider()
     button_disabled = remaining_time > 0
     if st.button("観察終了・評価へ進む", disabled=button_disabled):
@@ -281,12 +279,11 @@ elif st.session_state.step == "evaluation":
     current_image = all_images[st.session_state.eval_index]
     col1, col2 = st.columns([1, 1])
     with col1:
-        main_img_b64 = get_image_base64(current_image)
-        if main_img_b64:
-            main_html = f"""
-            <img src="{main_img_b64}" style="width:100%; height:auto; max-height:650px; object-fit:contain; display:block; border-radius:8px; margin-bottom:1rem;">
-            """
-            st.markdown(main_html, unsafe_allow_html=True)
+        eval_cropped_img = load_and_center_crop(current_image, size=600)
+        if eval_cropped_img:
+            st.image(eval_cropped_img, use_container_width=True)
+        else:
+            st.image(current_image, use_container_width=True)
         st.markdown(
             f"""
             <div class="custom-card">
