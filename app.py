@@ -62,7 +62,7 @@ st.markdown(
 BASE_DIR = "Image"
 MAX_OBSERVATION_IMAGES = 100
 OBSERVATION_NUM_COLS = 6
-OBSERVATION_SECONDS = 2
+OBSERVATION_SECONDS = 120
 
 parts_options = {
     "こけし": ["頭部", "胴体"],
@@ -135,10 +135,11 @@ def save_to_gsheet(df):
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    credentials = Credentials.from_service_account_file(
-        "service_account.json",
-        scopes=scopes
-    )
+    secret_info = dict(st.secrets["gcp_service_account"])
+    credentials = Credentials.from_service_account_info(
+        secret_info,
+        scopes=scopes)
+    
     gc = gspread.authorize(credentials)
     spreadsheet = gc.open("BESC_Evaluation")
     worksheet = spreadsheet.sheet1
