@@ -62,7 +62,7 @@ st.markdown(
 BASE_DIR = "Image"
 MAX_OBSERVATION_IMAGES = 100
 OBSERVATION_NUM_COLS = 6
-OBSERVATION_SECONDS = 5
+OBSERVATION_SECONDS = 120
 
 parts_options = {
     "こけし": ["頭部", "胴体"],
